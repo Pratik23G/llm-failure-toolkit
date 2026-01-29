@@ -7,11 +7,14 @@ from dotenv import load_dotenv
 def sayAI(user):
     print("Hello", user)
 
-
-load_dotenv()
+def config():
+    load_dotenv()
 
 #Actual code:
 class AIBot:
+    
+    config()
+
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.chats = self.client.chats.create(model="gemini-2.5-flash")
@@ -23,7 +26,6 @@ class AIBot:
         fullUserText = " "
 
         for chunks in responseAi:
-            print(chunks.text, end = " ", flush = True)
             fullUserText += chunks.text
         print()
 

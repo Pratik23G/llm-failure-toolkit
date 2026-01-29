@@ -1,4 +1,4 @@
-print("Hello this is a sample test run for analysis")
+
 
 """
 Runner:
@@ -10,21 +10,32 @@ model settings and imports
 
 """
 
+import time
+
+from datetime import datetime, timezone
 
 from llm.client import  SEGAI
 
 from logger import run_logger
 
-# this line of code is only for test-purposes will be kater removed
-print(run_logger.displayStats("GPT-4", "45 ms", "140 Degrees"))
+if __name__ == "__main__":
 
+    #Condition which runs as long user does not type exit
+    # This prompt helps to have converstion between user and Model  
+    while True:
+            userQuery = input(">- ")
 
+            if userQuery == "exit":
+                break
+            
+            time_stamps = datetime.now(timezone.utc).isoformat()
+            startTime = time.perf_counter()
+            response_text = SEGAI.callModel(userQuery)
 
+            print(response_text)
 
-while True:
-        userQuery = input(">- ")
+            endTime = time.perf_counter()
 
-        if userQuery == "exit":
-            break
+            total_run_time = endTime - startTime
 
-        SEGAI.callModel(userQuery)
+            run_logger.log_run(userQuery, response_text, "Gemini-Flask-2.5", total_run_time, time_stamps)
