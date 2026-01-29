@@ -1,38 +1,127 @@
-This is a PET PRJECT FOR MY FINAL CAPSTONE PROJECT BASED ON LLM Failure 
-Analysis and Debugging Toolkit
+# LLM Prompt Runner & Logging Harness  
+**Pet Project 1 – Foundation for LLM Failure Analysis & Debugging Toolkit**
 
-For this project The goal is simple:
+This repository contains **Project 1** of a multi-stage capstone focused on building an **LLM Failure Analysis & Debugging Toolkit**.
 
-I would like to build a "A.I. prompt Runner and Logging Harness"
+The purpose of this project is to create a **reliable prompt execution engine** and a **structured logging harness** that captures everything needed for downstream analysis (latency, metadata, outputs).
 
-##Project Goal##:
-<-------->*************************************<------------------------------->
-    What this project does?
-    ---> Goal is to build a simple engine that runs prompts/ on LLM
-        models take them as tasks and store their logs and latency
+---
 
-    There are 2 parts in the project:
-        Prompt Runner: A simple program that takes prompts from users, sends it
-        to a LLM model like OPEN A.I. GPT, OLAMA, Gemini, receives model's
-        answer and prints and returns the answer.
+## 🎯 Project Goal
 
-        Logging Harness: We then store those results in a DataBase, it stores
-            what happens in each prompt, it saves a copy report:
-                1. What did user prompt
-                2. How long did it take for the model to response
-                3. What was their response
-                4. How accurate was the response
-                5. Compare the statistics among the different models
-                6. What prompts took longer for the correct response
+Build a simple but robust system that:
 
-==================================***===========================================
-Some major tools and components of the project:
-    Runner: run.py [This is our main program runner which shows the stat for both projects]
+- Runs prompts/tasks against Large Language Models (LLMs)
+- Measures execution metadata (timestamps, latency, model info)
+- Logs every run in a structured format (JSONL)
+- Serves as the **data backbone** for later failure analysis
 
-    Logger: runLogger.py [This project focuses on keeping track of the records]
+This project focuses on **observability and infrastructure**, not evaluation yet.
 
-    Client prompts: client.py [This program specifically talks with LLM models and sends prompts]
+---
 
-    data stored: runs.jsonl [Stores the records and necessary data]
+## 🧠 Why This Matters
 
-================================***============================================
+To debug LLM behavior, you must first **observe it**.
+
+This logging harness enables future capabilities such as:
+- Failure detection
+- Hallucination analysis
+- Prompt debugging
+- Model comparison
+- Automated reporting
+
+---
+
+## 🧩 Project Components
+
+### Prompt Runner (`run.py`)
+- CLI-based prompt execution
+- Sends user prompts to an LLM
+- Prints model responses
+- Measures:
+  - request timestamp (UTC)
+  - execution latency
+- Passes all data to the logger
+
+---
+
+### LLM Client (`llm/client.py`)
+- Handles communication with the LLM provider
+- Uses environment variables for API keys
+- Abstracted to support multiple providers later
+
+---
+
+### Logging Harness (`logger/run_logger.py`)
+- Receives prompt, response, and metadata
+- Writes **one JSON object per run**
+- Uses JSON Lines (`.jsonl`) format
+- Designed for append-only logging and easy ingestion
+
+---
+
+### Run Data (`data/runs.jsonl`)
+- Stores execution logs
+- One line = one prompt run
+- Not committed to version control
+
+---
+
+## 📁 Project Structure
+llm-failure-toolkit/
+│
+├── run.py # Main prompt runner
+├── llm/
+│ └── client.py # LLM client abstraction
+│
+├── logger/
+│ └── run_logger.py # Logging harness
+│
+├── data/
+│ └── runs.jsonl # Runtime logs (gitignored)
+│
+├── README.md
+└── requirements.txt
+
+
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/<your-username>/llm-failure-toolkit.git
+cd llm-failure-toolkit
+
+
+2️⃣ Create and activate a virtual environment
+python -m venv llmenv
+
+
+Windows
+=================
+llmenv\Scripts\activate
+
+
+macOS / Linux
+=======================
+source llmenv/bin/activate
+
+3️⃣ Install dependencies
+==============================
+pip install -r requirements.txt
+
+4️⃣ Configure environment variables
+===================================
+Create a .env file (not committed) and add your API key:
+=================================
+GEMINI_API_KEY=your_api_key_here
+
+
+5️⃣ Run the prompt runner
+========================
+python run.py
+
+
