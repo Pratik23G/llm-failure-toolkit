@@ -124,4 +124,33 @@ GEMINI_API_KEY=your_api_key_here
 ========================
 python run.py
 
+---
+## ---------------------------------------------------------------------------------------------- ##
+** Pet Project-2 Validator of the model **
+Verify what does the model, do different and check its failed cases, understand its failure points
+Store the validation results, 
+Update it into my jsons file
 
+The whole objective is to validate the outputs given by the model
+
+## Updated 📁 Project Structure
+
+llm-failure-toolkit/
+│
+├── run.py # Main prompt runner
+├── llm/
+│ └── client.py # LLM client abstraction
+|
+|___ validators/
+|   └── __init__.py
+|   └── base.py
+|   └── basic_validators.py
+|
+├── logger/
+│ └── run_logger.py # Logging harness
+│
+├── data/
+│ └── runs.jsonl # Runtime logs (gitignored)
+│
+├── README.md
+└── requirements.txt
