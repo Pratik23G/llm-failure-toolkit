@@ -50,7 +50,7 @@ class LongOutputValidator(BaseValidator):
     def validateTests(self, context: contextValidation) -> dict:
         model_longer_resp = context.model_response or ""
         cleaned_resp = model_longer_resp.strip()
-        limit = MODEL_CONTEXT_LENGTH or context.max_output_tkns
+        limit = context.max_output_chars or MODEL_CONTEXT_LENGTH
         is_too_long = len(cleaned_resp) > limit
    
         return self.build_result(
