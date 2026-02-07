@@ -13,7 +13,7 @@ def log_run(userQuery, response_text, model_name, latency, time_stamps, validati
                 "user_message": userQuery, 
                 "ai_response": response_text,
                 "model_name": model_name,
-                "latency(ms)": latency,
+                "latency_ms": latency,
                 "time_stamp": time_stamps,
                 "validation": validation,
             }
