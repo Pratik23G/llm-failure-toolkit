@@ -29,6 +29,24 @@ if __name__ == "__main__":
 
     #Global validators list
     validate_list = [EmptyOutputValidator(), ShortOutputValidator(), LongOutputValidator()]
+
+    #Build a stub-agent OpenAI-0.01
+    open_ai_stub_model = {
+         "Hi Open AI": "Hi! How can I assist you today?",
+         "What is the most trending language in the market?" : "According to the internet it seems python for now",
+         "Can you give me the distance for the moon?" : " ",
+         "Ok Bye Open A.I." : "Bye :D"
+    }
+
+    #function for stub_sgent which reeplies to user_prompts
+
+    def open_stub_response(userQuery):
+        if userQuery in open_ai_stub_model:
+            response_text2 = open_ai_stub_model[userQuery]
+        else:
+            response_text2 = "I am not sure"
+        return response_text2
+
     #Condition which runs as long user does not type exit
     # This prompt helps to have converstion between user and Model  
     while True:
@@ -37,20 +55,28 @@ if __name__ == "__main__":
             if userQuery == "exit":
                 break
             
+            agents = [ ("Gemini-Flask-2.5", SEGAI.callModel), ("Open-A.I.-0.01", open_stub_response)]
+
             time_stamps = datetime.now(timezone.utc).isoformat()
-            startTime = time.perf_counter()
-            response_text = SEGAI.callModel(userQuery)
 
-            context_r = contextValidation(userQuery, response_text, "Gemini-Flask-2.5")
-            print(response_text)
+            for agent_name, agent_fn in agents:
+                 
+                startTime = time.perf_counter()
+                response_text = agent_fn(userQuery)
 
-            endTime = time.perf_counter()
+                endTime = time.perf_counter()
 
-            total_run_time = endTime - startTime
+                total_run_time = endTime - startTime
 
-            
-            report_log = RunAllTests.run_validators(context_r, validate_list)
-            run_logger.log_run(userQuery, response_text, "Gemini-Flask-2.5", total_run_time, time_stamps, report_log)
-            
+                context_r = contextValidation(userQuery, response_text, agent_name)
+                report_log = RunAllTests.run_validators(context_r, validate_list)
 
+                print(f"\n[{agent_name}]")
+                print(response_text)
+
+                
+                
+                
+                run_logger.log_run(userQuery, response_text, agent_name , total_run_time, time_stamps, report_log)
+                
     

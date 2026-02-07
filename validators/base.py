@@ -18,11 +18,11 @@ class BaseValidator(ABC):
     def build_result(self, context: contextValidation, passed: bool, 
                      error: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> dict:
         d = { 
-             "user_prompt ":context.user_prompt,
-            "model_response ":context.model_response or "",
-            "model_name " :context.model_name,
-            "passed ": passed,
-            "errors" :error
+             "user_prompt":context.user_prompt,
+            "model_response":context.model_response or "",
+            "model_name" :context.model_name,
+            "passed": passed,
+            "error":error
         }
         if meta:
              d["meta"] = meta
