@@ -14,7 +14,7 @@ import time
 
 from datetime import datetime, timezone
 
-from llm.client import  SEGAI
+from llm.client import AIBot, SecondAIBot
 
 from logger import run_logger
 
@@ -39,14 +39,16 @@ if __name__ == "__main__":
     }
 
     #function for stub_sgent which reeplies to user_prompts
+    class StubBot:
+        def call(self, userQuery):
+            if userQuery in open_ai_stub_model:
+                response_text2 = open_ai_stub_model[userQuery]
+            else:
+                response_text2 = "I am not sure"
+            return response_text2
 
-    def open_stub_response(userQuery):
-        if userQuery in open_ai_stub_model:
-            response_text2 = open_ai_stub_model[userQuery]
-        else:
-            response_text2 = "I am not sure"
-        return response_text2
-
+    bots = [AIBot(), StubBot(), SecondAIBot()]
+    names = ["Gemini-Flask-2.5", "Open-A.I.-0.01", "openai/gpt-oss-120b"]
     #Condition which runs as long user does not type exit
     # This prompt helps to have converstion between user and Model  
     while True:
@@ -55,14 +57,12 @@ if __name__ == "__main__":
             if userQuery == "exit":
                 break
             
-            agents = [ ("Gemini-Flask-2.5", SEGAI.callModel), ("Open-A.I.-0.01", open_stub_response)]
-
             time_stamps = datetime.now(timezone.utc).isoformat()
 
-            for agent_name, agent_fn in agents:
+            for agent_name, bot in zip(names, bots):
                  
                 startTime = time.perf_counter()
-                response_text = agent_fn(userQuery)
+                response_text = bot.call(userQuery)
 
                 endTime = time.perf_counter()
 
@@ -74,9 +74,6 @@ if __name__ == "__main__":
                 print(f"\n[{agent_name}]")
                 print(response_text)
 
-                
-                
-                
                 run_logger.log_run(userQuery, response_text, agent_name , total_run_time, time_stamps, report_log)
                 
     
