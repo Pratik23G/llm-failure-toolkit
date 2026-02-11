@@ -3,14 +3,14 @@ from google import genai
 from openai import OpenAI
 
 
-from dotenv import load_dotenv 
+
 
 #This is a test function please ignore its existence here
 def sayAI(user):
     print("Hello", user)
 
 
-load_dotenv()
+
 
 #Actual code:
 
@@ -20,7 +20,6 @@ class AIBot:
         self.chats = self.client.chats.create(model="gemini-2.5-flash")
 
     def call(self, userPromptText):
-
         responseAi = self.chats.send_message_stream(userPromptText)
 
         fullUserText = " "
@@ -28,6 +27,7 @@ class AIBot:
         for chunks in responseAi:
             fullUserText += chunks.text
         print()
+
 
         return fullUserText
 
@@ -45,7 +45,7 @@ class SecondAIBot:
 
     
     def call(self, userPromptText):
-
+        
         aiResp = self.client.chat.completions.create(
             model = self.model,
             messages=[{"role":"user","content": userPromptText}]
