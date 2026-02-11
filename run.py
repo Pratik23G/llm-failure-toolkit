@@ -15,7 +15,7 @@ import asyncio
 
 from datetime import datetime, timezone
 
-from llm.client import AIBot, SecondAIBot
+from llm.client import AIBot, SecondAIBot, AgentLatencyAnalysis
 
 from logger import run_logger
 
@@ -44,12 +44,20 @@ async def main():
 
         #function for stub_sgent which reeplies to user_prompts
         class StubBot:
+            def __init__(self):
+                 self.monitor = AgentLatencyAnalysis()
+                 
+
             def call(self, userQuery):
-                if userQuery in open_ai_stub_model:
-                    response_text2 = open_ai_stub_model[userQuery]
-                else:
-                    response_text2 = "I am not sure"
-                return response_text2
+                startTime = time.perf_counter()
+                try: 
+                    if userQuery in open_ai_stub_model:
+                        response_text2 = open_ai_stub_model[userQuery]
+                    else:
+                        response_text2 = "I am not sure"
+                    return response_text2
+                finally:
+                     self.monitor.log_latency(time.perf_counter() - startTime)
 
         bots = [AIBot(), StubBot(), SecondAIBot()]
         names = ["Gemini-Flask-2.5", "Open-A.I.-0.01", "openai/gpt-oss-120b"]
@@ -67,18 +75,18 @@ async def main():
 
                 fan_out_start = time.perf_counter()
 
-                for agent_name, bot in zip(names, bots):
+                for bot in bots:
                     threadTask = asyncio.wait_for(asyncio.to_thread(bot.call, userQuery), timeout = 20)
 
-                    tasks.append(threadTask)
+                    tasks.append(threadTask) 
 
                     
                 results = await asyncio.gather(*tasks , return_exceptions = True)
 
                 fan_elapsed_time = time.perf_counter() - fan_out_start
 
-                for agents, result in  zip(names, results):
-
+                for agents, bot, result in  zip(names, bots, results):
+                    
                     if isinstance(result, Exception):
                          error_message = str(result)
                          response_text = f"ERROR: {error_message}"
@@ -86,11 +94,13 @@ async def main():
                          response_text = result
 
                     context_r = contextValidation(userQuery, response_text, agents)
-                    report_log = RunAllTests.run_validators(context_r, validate_list)
+                    validation = RunAllTests.run_validators(context_r, validate_list)
                     print(f"\n[{agents}]")
                     print(response_text)
 
-                    run_logger.log_run(userQuery, response_text, agents , fan_elapsed_time, time_stamps, report_log)
+                    agent_latency_last_sec = bot.monitor.last_latency
+                    agents_run_log = bot.monitor.get_latency_metrics()
+                    run_logger.log_run(userQuery, response_text, agents , fan_elapsed_time, time_stamps, agents_run_log, validation = validation, agent_latency_last_sec = agent_latency_last_sec)
     
 if __name__ == "__main__":
      asyncio.run(main())
