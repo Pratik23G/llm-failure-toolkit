@@ -15,7 +15,7 @@ import asyncio
 
 from datetime import datetime, timezone
 
-from llm.client import AIBot, SecondAIBot, AgentLatencyAnalysis
+from llm.client import AIBot, SecondAIBot, AgentLatencyAnalysis, HandleErrorLogs
 
 from logger import run_logger
 
@@ -45,8 +45,11 @@ async def main():
         #function for stub_sgent which reeplies to user_prompts
         class StubBot:
             def __init__(self):
-                 self.monitor = AgentLatencyAnalysis()
-                 
+                self.monitor = AgentLatencyAnalysis()
+                self.errorLogs = HandleErrorLogs()
+
+            
+            
 
             def call(self, userQuery):
                 startTime = time.perf_counter()
@@ -64,12 +67,18 @@ async def main():
         #Condition which runs as long user does not type exit
         # This prompt helps to have converstion between user and Model  
         while True:
-                userQuery = input(">- ")
+                try:
+                    userQuery = input(">- ")
+                except EOFError:
+                    break
 
                 if userQuery == "exit":
                     break
                 
                 time_stamps = datetime.now(timezone.utc).isoformat()
+
+                run_id = f"{time_stamps}-{userQuery}"
+
 
                 tasks = []
 
@@ -87,11 +96,13 @@ async def main():
 
                 for agents, bot, result in  zip(names, bots, results):
                     
-                    if isinstance(result, Exception):
+                    response_text  = bot.errorLogs.set_from_result(result)
+                    error_meta = bot.errorLogs.get_meta()
+                    """  if isinstance(result, Exception):
                          error_message = str(result)
                          response_text = f"ERROR: {error_message}"
                     else:
-                         response_text = result
+                         response_text = result """
 
                     context_r = contextValidation(userQuery, response_text, agents)
                     validation = RunAllTests.run_validators(context_r, validate_list)
@@ -100,7 +111,7 @@ async def main():
 
                     agent_latency_last_sec = bot.monitor.last_latency
                     agents_run_log = bot.monitor.get_latency_metrics()
-                    run_logger.log_run(userQuery, response_text, agents , fan_elapsed_time, time_stamps, agents_run_log, validation = validation, agent_latency_last_sec = agent_latency_last_sec)
+                    run_logger.log_run(userQuery, response_text, agents , fan_elapsed_time, time_stamps, agents_run_log, validation = validation, agent_latency_last_sec = agent_latency_last_sec, error_meta = error_meta, run_id=run_id)
     
 if __name__ == "__main__":
      asyncio.run(main())
