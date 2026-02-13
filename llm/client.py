@@ -1,4 +1,5 @@
 import os
+#from pydoc import text
 from google import genai
 from openai import OpenAI
 import time
@@ -10,6 +11,7 @@ import numpy as np
 #This is a test function please ignore its existence here
 def sayAI(user):
     print("Hello", user)
+
 
 
 # a helper function which tracks down the latency for every agentic model
@@ -43,6 +45,8 @@ class AIBot:
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.chats = self.client.chats.create(model="gemini-2.5-flash")
         self.monitor = AgentLatencyAnalysis()
+        self.errorLogs = HandleErrorLogs()
+    
 
     def call(self, userPromptText):
         
@@ -54,11 +58,14 @@ class AIBot:
             fullUserText = ""
 
             for chunks in responseAi:
-                fullUserText += chunks.text
-            print()
+                text = getattr(chunks, "text", "")
+                if text:
+                    fullUserText += text
             return fullUserText
+
         finally:
             self.monitor.log_latency(time.perf_counter() - startTime)
+        
         
 
 class SecondAIBot:
@@ -73,6 +80,7 @@ class SecondAIBot:
                     )
         self.model = "openai/gpt-oss-120b"
         self.monitor = AgentLatencyAnalysis()
+        self.errorLogs = HandleErrorLogs()
     
     def call(self, userPromptText):
         
@@ -88,6 +96,27 @@ class SecondAIBot:
             self.monitor.log_latency(time.perf_counter() - startTime)
         
 
+# a class which handles errors and test cases to store in a meta data 
+# in python rather than string issues
 
+class HandleErrorLogs:
 
+    def __init__(self):
+        self.meta = {}
+    
+    def set_from_result(self, model_result):
+        
+        self.meta = {}
 
+        if isinstance(model_result, Exception):
+
+            self.meta["ok"] = False
+            self.meta["error_type"] = type(model_result).__name__
+            self.meta["error_message"] = str(model_result)
+            return f"ERROR: {self.meta['error_message']}"
+        else:
+            self.meta["ok"] = True
+            return "" if model_result is None else str(model_result)
+            
+    def get_meta(self):
+        return self.meta
