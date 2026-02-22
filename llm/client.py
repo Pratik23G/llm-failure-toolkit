@@ -74,15 +74,16 @@ class AIBot(BaseAgent):
 
 class SecondAIBot(BaseAgent):
     def __init__(self):
-        key = os.getenv("NEBIUS_API_KEY")
+        key = os.getenv("OPENROUTER_API_KEY")
 
         if not key:
-            raise ValueError("Missing or invalid NEBIUS_API_KEY")
+            raise ValueError("Missing or invalid OPENROUTER_API_KEY")
 
-        self.client = OpenAI(api_key = key,
-                     base_url="https://api.tokenfactory.nebius.com/v1/"        
-                    )
-        self.model = "openai/gpt-oss-120b"
+        self.client = OpenAI(
+            api_key=key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        self.model = "meta-llama/llama-3.1-8b-instruct:free"
         self.monitor = AgentLatencyAnalysis()
         self.errorLogs = HandleErrorLogs()
     
@@ -163,7 +164,7 @@ def build_registry() -> dict:
     registry["stub"] = ("Open-A.I.-0.01", StubBot())
 
     try:
-        registry["openai"] = ("openai/gpt-oss-120b", SecondAIBot())
+        registry["openai"] = ("meta-llama/llama-3.1-8b-instruct:free", SecondAIBot())
     except Exception as exc:
         print(f"[warn] openai agent unavailable: {exc}")
 
