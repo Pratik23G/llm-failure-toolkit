@@ -1,4 +1,4 @@
-# LLM Prompt Runner & Logging Harness  
+# LLM Prompt Runner & Logging Harness
 **Pet Project 1 – Foundation for LLM Failure Analysis & Debugging Toolkit**
 
 This repository contains **Project 1** of a multi-stage capstone focused on building an **LLM Failure Analysis & Debugging Toolkit**.
@@ -7,20 +7,19 @@ The purpose of this project is to create a **reliable prompt execution engine** 
 
 ---
 
-## 🎯 Project Goal
+## Project Goal
 
 Build a simple but robust system that:
 
 - Runs prompts/tasks against Large Language Models (LLMs)
 - Measures execution metadata (timestamps, latency, model info)
 - Logs every run in a structured format (JSONL)
+- Validates model responses for quality failures
 - Serves as the **data backbone** for later failure analysis
-
-This project focuses on **observability and infrastructure**, not evaluation yet.
 
 ---
 
-## 🧠 Why This Matters
+## Why This Matters
 
 To debug LLM behavior, you must first **observe it**.
 
@@ -33,124 +32,153 @@ This logging harness enables future capabilities such as:
 
 ---
 
-## 🧩 Project Components
+## Project Components
 
 ### Prompt Runner (`run.py`)
 - CLI-based prompt execution
-- Sends user prompts to an LLM
-- Prints model responses
-- Measures:
-  - request timestamp (UTC)
-  - execution latency
-- Passes all data to the logger
-
----
+- Fans out user prompts to multiple agents **concurrently**
+- Measures request timestamp (UTC) and per-agent latency (p50/p95/p99)
+- Validates each response and passes all data to the logger
 
 ### LLM Client (`llm/client.py`)
-- Handles communication with the LLM provider
-- Uses environment variables for API keys
-- Abstracted to support multiple providers later
+- `BaseAgent` ABC — shared interface contract for all agents
+- `AIBot` — Google Gemini Flash 2.5 (streaming)
+- `SecondAIBot` — Nebius-hosted OpenAI-compatible model
+- `StubBot` — offline deterministic agent (no API key required)
+- `AgentLatencyAnalysis` — rolling p50/p95/p99 latency tracking
+- `HandleErrorLogs` — normalises exceptions vs valid responses
+- `build_registry()` — factory that initialises agents after env vars are loaded
 
----
+### Validators (`validators/`)
+- `BaseValidator` — abstract base with shared `build_result()` contract
+- `EmptyOutputValidator` — catches blank or whitespace-only responses
+- `ShortOutputValidator` — catches responses under 10 characters
+- `LongOutputValidator` — catches responses exceeding 300 characters (configurable)
+- `RunAllTests` — runs all validators and returns an aggregate pass/fail dict
+
+### Benchmark Runner (`benchmarks/`)
+- `prompts.json` — 10 predefined prompts covering normal, edge-case, and failure-trigger scenarios
+- `runner.py` — fans out each prompt to all agents, collects validation + latency, writes `data/benchmark_results.jsonl`, and prints a per-agent summary report
 
 ### Logging Harness (`logger/run_logger.py`)
-- Receives prompt, response, and metadata
-- Writes **one JSON object per run**
-- Uses JSON Lines (`.jsonl`) format
-- Designed for append-only logging and easy ingestion
+- Receives prompt, response, and all metadata
+- Writes **one JSON object per run** to `data/runs.jsonl`
+- Append-only, JSONL format — easy to ingest for analysis
 
 ---
 
-### Run Data (`data/runs.jsonl`)
-- Stores execution logs
-- One line = one prompt run
-- Not committed to version control
+## Project Structure
 
----
-
-## 📁 Project Structure
+```
 llm-failure-toolkit/
 │
-├── run.py # Main prompt runner
+├── run.py                    # Main prompt runner (interactive + single-shot)
+│
 ├── llm/
-│ └── client.py # LLM client abstraction
+│   └── client.py             # BaseAgent, AIBot, SecondAIBot, StubBot, build_registry
+│
+├── validators/
+│   ├── __init__.py
+│   ├── base.py               # contextValidation dataclass + BaseValidator ABC
+│   ├── basic_validators.py   # Empty, Short, Long output validators
+│   └── runner.py             # RunAllTests — runs all validators, returns aggregate result
+│
+├── benchmarks/
+│   ├── __init__.py
+│   ├── prompts.json          # 10 predefined benchmark prompts
+│   └── runner.py             # Benchmark runner — reports per-agent pass rates & latency
 │
 ├── logger/
-│ └── run_logger.py # Logging harness
+│   └── run_logger.py         # Logging harness — appends to data/runs.jsonl
 │
 ├── data/
-│ └── runs.jsonl # Runtime logs (gitignored)
+│   ├── runs.jsonl            # Runtime logs (gitignored)
+│   └── benchmark_results.jsonl  # Benchmark run logs (gitignored)
 │
-├── README.md
-└── requirements.txt
-
-
+├── .env.example
+├── requirements.txt
+└── README.md
+```
 
 ---
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
-### 1️⃣ Clone the repository
+### 1. Clone the repository
 ```bash
 git clone https://github.com/<your-username>/llm-failure-toolkit.git
 cd llm-failure-toolkit
+```
 
-
-2️⃣ Create and activate a virtual environment
+### 2. Create and activate a virtual environment
+```bash
 python -m venv llmenv
 
-
-Windows
-=================
+# Windows
 llmenv\Scripts\activate
 
-
-macOS / Linux
-=======================
+# macOS / Linux
 source llmenv/bin/activate
+```
 
-3️⃣ Install dependencies
-==============================
+### 3. Install dependencies
+```bash
 pip install -r requirements.txt
+```
 
-4️⃣ Configure environment variables
-===================================
-Create a .env file (not committed) and add your API key:
-=================================
-GEMINI_API_KEY=your_api_key_here
-
-
-5️⃣ Run the prompt runner
-========================
-python run.py
+### 4. Configure environment variables
+Create a `.env` file and add your API keys:
+```
+GEMINI_API_KEY=your_gemini_key_here
+NEBIUS_API_KEY=your_nebius_key_here
+```
 
 ---
-## ---------------------------------------------------------------------------------------------- ##
-** Pet Project-2 Validator of the model **
-Verify what does the model, do different and check its failed cases, understand its failure points
-Store the validation results, 
-Update it into my jsons file
 
-The whole objective is to validate the outputs given by the model
+## CLI Usage
 
-## Updated 📁 Project Structure
+### Interactive mode (loop until `exit`)
+```bash
+python run.py
+```
 
-llm-failure-toolkit/
-│
-├── run.py # Main prompt runner
-├── llm/
-│ └── client.py # LLM client abstraction
-|
-|___ validators/
-|   └── __init__.py
-|   └── base.py
-|   └── basic_validators.py
-|
-├── logger/
-│ └── run_logger.py # Logging harness
-│
-├── data/
-│ └── runs.jsonl # Runtime logs (gitignored)
-│
-├── README.md
-└── requirements.txt
+### Single-shot prompt mode
+```bash
+python run.py --prompt "What is the capital of France?"
+```
+
+### Select specific agents
+```bash
+python run.py --prompt "Hello" --agents gemini stub
+python run.py --prompt "Hello" --agents stub          # offline, no API key needed
+```
+
+### Set a custom timeout
+```bash
+python run.py --prompt "Hello" --timeout 10
+```
+
+### Run the benchmark suite
+```bash
+# All agents (default)
+python -m benchmarks.runner
+
+# Offline only (no API keys needed)
+python -m benchmarks.runner --agents stub
+
+# Specific agents with custom timeout
+python -m benchmarks.runner --agents gemini openai --timeout 30
+```
+
+---
+
+## Pet Project 2 — Validator
+
+Validate outputs given by the model, detect failure cases, and store validation results.
+
+**Validators implemented:**
+- `EmptyOutputValidator` — flags blank responses
+- `ShortOutputValidator` — flags responses under 10 chars
+- `LongOutputValidator` — flags responses over 300 chars
+
+**Benchmark suite:** 10 prompts designed to trigger and surface specific failure modes across all agents.

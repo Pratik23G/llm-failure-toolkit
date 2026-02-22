@@ -1,0 +1,62 @@
+[
+  {
+    "id": "greeting_basic",
+    "prompt": "Hello, how are you?",
+    "tags": ["normal", "greeting"],
+    "notes": "Basic greeting — should produce a normal-length response from real agents"
+  },
+  {
+    "id": "factual_capital",
+    "prompt": "What is the capital of France?",
+    "tags": ["normal", "factual"],
+    "notes": "Simple factual question — short but valid answer expected"
+  },
+  {
+    "id": "math_simple",
+    "prompt": "What is 15 multiplied by 7?",
+    "tags": ["normal", "math"],
+    "notes": "Arithmetic — answer should be concise and correct"
+  },
+  {
+    "id": "code_hello_world",
+    "prompt": "Write a Python hello world program.",
+    "tags": ["normal", "code"],
+    "notes": "Simple code generation — response should exceed min length"
+  },
+  {
+    "id": "stub_known_greeting",
+    "prompt": "Hi Open AI",
+    "tags": ["stub_known"],
+    "notes": "Stub returns known greeting — should pass all validators"
+  },
+  {
+    "id": "stub_known_language",
+    "prompt": "What is the most trending language in the market?",
+    "tags": ["stub_known"],
+    "notes": "Stub returns known Python answer — should pass all validators"
+  },
+  {
+    "id": "stub_known_bye",
+    "prompt": "Ok Bye Open A.I.",
+    "tags": ["stub_known", "short_output"],
+    "notes": "Stub returns 'Bye :D' (6 chars) — should fail ShortOutputValidator"
+  },
+  {
+    "id": "stub_empty_trigger",
+    "prompt": "Can you give me the distance for the moon?",
+    "tags": ["edge_case", "empty_trigger"],
+    "notes": "Stub returns a single space — should fail EmptyOutputValidator and ShortOutputValidator"
+  },
+  {
+    "id": "unknown_stub_prompt",
+    "prompt": "What is the weather like today?",
+    "tags": ["edge_case", "unknown_stub"],
+    "notes": "Stub returns 'I am not sure' (13 chars) — passes min length, real agents give full answer"
+  },
+  {
+    "id": "long_response_trigger",
+    "prompt": "Explain in detail how transformers work in machine learning, including attention mechanisms, encoder-decoder architecture, and training objectives.",
+    "tags": ["long_output"],
+    "notes": "Verbose topic — real agents likely exceed 300 chars, triggering LongOutputValidator"
+  }
+]

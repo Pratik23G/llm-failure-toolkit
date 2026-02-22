@@ -1,16 +1,10 @@
 import os
-#from pydoc import text
+from abc import ABC, abstractmethod
 from google import genai
 from openai import OpenAI
 import time
 import numpy as np
 
-
-
-
-#This is a test function please ignore its existence here
-def sayAI(user):
-    print("Hello", user)
 
 
 
@@ -38,9 +32,19 @@ class AgentLatencyAnalysis:
         }
 
 
+class BaseAgent(ABC):
+    """Shared contract every agent must satisfy."""
+    monitor: "AgentLatencyAnalysis"
+    errorLogs: "HandleErrorLogs"
+
+    @abstractmethod
+    def call(self, userPromptText: str) -> str:
+        pass
+
+
 #Actual code:
 
-class AIBot:
+class AIBot(BaseAgent):
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.chats = self.client.chats.create(model="gemini-2.5-flash")
@@ -68,7 +72,7 @@ class AIBot:
         
         
 
-class SecondAIBot:
+class SecondAIBot(BaseAgent):
     def __init__(self):
         key = os.getenv("NEBIUS_API_KEY")
 
@@ -120,3 +124,47 @@ class HandleErrorLogs:
             
     def get_meta(self):
         return self.meta
+
+
+_STUB_RESPONSES = {
+    "Hi Open AI": "Hi! How can I assist you today?",
+    "What is the most trending language in the market?": "According to the internet it seems python for now",
+    "Can you give me the distance for the moon?": " ",
+    "Ok Bye Open A.I.": "Bye :D",
+}
+
+
+class StubBot(BaseAgent):
+    """Offline stub agent — deterministic responses, no API key required."""
+
+    def __init__(self):
+        self.monitor = AgentLatencyAnalysis()
+        self.errorLogs = HandleErrorLogs()
+
+    def call(self, userQuery: str) -> str:
+        startTime = time.perf_counter()
+        try:
+            return _STUB_RESPONSES.get(userQuery, "I am not sure")
+        finally:
+            self.monitor.log_latency(time.perf_counter() - startTime)
+
+
+def build_registry() -> dict:
+    """Instantiate all agents after env vars are loaded.
+    Agents that fail to initialise (missing API key) are skipped with a warning.
+    """
+    registry: dict = {}
+
+    try:
+        registry["gemini"] = ("Gemini-Flash-2.5", AIBot())
+    except Exception as exc:
+        print(f"[warn] gemini agent unavailable: {exc}")
+
+    registry["stub"] = ("Open-A.I.-0.01", StubBot())
+
+    try:
+        registry["openai"] = ("openai/gpt-oss-120b", SecondAIBot())
+    except Exception as exc:
+        print(f"[warn] openai agent unavailable: {exc}")
+
+    return registry
