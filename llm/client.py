@@ -83,7 +83,7 @@ class SecondAIBot(BaseAgent):
             api_key=key,
             base_url="https://openrouter.ai/api/v1",
         )
-        self.model = "meta-llama/llama-3.1-8b-instruct:free"
+        self.model = "google/gemma-3-4b-it:free"
         self.monitor = AgentLatencyAnalysis()
         self.errorLogs = HandleErrorLogs()
     
@@ -164,7 +164,7 @@ def build_registry() -> dict:
     registry["stub"] = ("Open-A.I.-0.01", StubBot())
 
     try:
-        registry["openai"] = ("meta-llama/llama-3.1-8b-instruct:free", SecondAIBot())
+        registry["openai"] = ("google/gemma-3-4b-it:free", SecondAIBot())
     except Exception as exc:
         print(f"[warn] openai agent unavailable: {exc}")
 
