@@ -21,14 +21,20 @@ int main(int argc, char * argv[])
 
     std:: string strInput{};
 
-    int count = 0;
+    long long count = 0;
+    long long error_count = 0;
 
     while(std:: getline(inputFile, strInput)){
 
         count++;
+        
+        if (strInput.find("error") != std:: string:: npos){
+            error_count++;
+        }
     }
 
     std:: cout << count << std:: endl;
+    std:: cout << error_count << std:: endl;
 
     return 0;
 }
