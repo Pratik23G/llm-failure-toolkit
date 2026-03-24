@@ -1,0 +1,58 @@
+# ==========================================================================
+# Docker Compose — LLM Failure Toolkit
+# ==========================================================================
+#
+# This file defines two services:
+#
+#   1. app   — FastAPI server + compiled C++ binary
+#   2. redis — in-memory cache for log processing results
+#
+# HOW DOCKER NETWORKING WORKS HERE:
+# ──────────────────────────────────
+# Compose creates a private network.  The "app" container can reach Redis
+# at hostname "redis" (the service name).  That's why REDIS_URL uses
+# "redis://redis:6379" — the first "redis" is the protocol, the second
+# is the hostname that Compose's DNS resolves to the Redis container.
+#
+# ==========================================================================
+
+services:
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"         # Map host port 8000 → container port 8000
+    env_file:
+      - .env                # Load API keys from .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CPP_BINARY_PATH=cpp/log_processor
+      - LOG_FILE_PATH=data/runs.jsonl
+      - CACHE_TTL=3600
+    volumes:
+      # Mount the data directory so log files persist across container restarts.
+      # WHY A VOLUME?
+      # Without this, data written inside the container disappears when the
+      # container is removed.  The volume maps your host's data/ folder into
+      # the container, so runs.jsonl survives rebuilds.
+      - ./data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine     # Alpine = tiny image (~30 MB)
+    ports:
+      - "6379:6379"           # Expose for local debugging (optional)
+    volumes:
+      - redis_data:/data      # Persist cache across restarts
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  redis_data:                 # Named volume — Docker manages the storage

@@ -1,2 +1,7 @@
 google-genai
 python-dotenv
+openai
+numpy
+fastapi
+uvicorn[standard]
+redis
