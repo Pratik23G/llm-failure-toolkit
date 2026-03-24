@@ -1,0 +1,17 @@
+# Keep the Docker build context small and fast.
+# Everything listed here is NOT sent to the Docker daemon during `docker build`.
+# This matters because Docker copies the entire context into memory first.
+
+.git
+.env
+llmenv/
+__pycache__/
+*.pyc
+*.o
+*.out
+cpp/log_processor
+cpp/logg_processor
+cpp/outputDisplay
+data/runs.jsonl
+data/benchmark_results.jsonl
+.claude/

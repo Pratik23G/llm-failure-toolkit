@@ -1,69 +1,165 @@
-# LLM Prompt Runner & Logging Harness
-**Pet Project 1 – Foundation for LLM Failure Analysis & Debugging Toolkit**
+# LLM Failure Analysis & Debugging Toolkit
 
-This repository contains **Project 1** of a multi-stage capstone focused on building an **LLM Failure Analysis & Debugging Toolkit**.
-
-The purpose of this project is to create a **reliable prompt execution engine** and a **structured logging harness** that captures everything needed for downstream analysis (latency, metadata, outputs).
+A multi-layer system for running prompts against LLMs, logging structured results, processing logs with a multithreaded C++ binary, and serving everything through a cached REST API.
 
 ---
 
-## Project Goal
+## Architecture
 
-Build a simple but robust system that:
+```
+                         ┌─────────────────────────────────┐
+                         │         Client / Browser         │
+                         └────────────┬────────────────────┘
+                                      │  HTTP
+                                      ▼
+                         ┌─────────────────────────────────┐
+                         │     FastAPI Server (Python)      │
+                         │                                  │
+                         │  GET /health                     │
+                         │  GET /process-logs?file=...      │
+                         └────┬───────────────┬────────────┘
+                              │               │
+                   ┌──────────▼──┐    ┌───────▼──────────┐
+                   │    Redis    │    │  C++ log_processor│
+                   │   (cache)   │    │  (subprocess)     │
+                   │             │    │                   │
+                   │ SHA-256 key │    │ 4 threads, mutex  │
+                   │ TTL: 1 hour │    │ reads .jsonl      │
+                   └─────────────┘    └───────┬──────────┘
+                                              │
+                                      ┌───────▼──────────┐
+                                      │  data/runs.jsonl  │
+                                      │  (structured logs)│
+                                      └──────────────────┘
 
-- Runs prompts/tasks against Large Language Models (LLMs)
-- Measures execution metadata (timestamps, latency, model info)
-- Logs every run in a structured format (JSONL)
-- Validates model responses for quality failures
-- Serves as the **data backbone** for later failure analysis
+  ┌─────────────────────────────────────────────────────────────┐
+  │                    Prompt Runner (CLI)                       │
+  │                                                             │
+  │  run.py ──► LLM Agents (Gemini, OpenAI, Stub)             │
+  │         ──► Validators (Empty, Short, Long output)          │
+  │         ──► Logger ──► data/runs.jsonl                      │
+  │                                                             │
+  │  benchmarks/runner.py ──► Same pipeline × 10 prompts        │
+  └─────────────────────────────────────────────────────────────┘
+```
+
+**Data flow:**
+1. CLI runner fans out prompts to multiple LLM agents concurrently
+2. Each response is validated, timed, and logged to `data/runs.jsonl`
+3. The FastAPI server wraps the C++ binary to query log stats over HTTP
+4. Redis caches results keyed by file content hash (auto-invalidates on new data)
 
 ---
 
-## Why This Matters
+## Quick Start (Docker)
 
-To debug LLM behavior, you must first **observe it**.
+```bash
+# 1. Clone
+git clone https://github.com/Pratik23G/llm-failure-toolkit.git
+cd llm-failure-toolkit
 
-This logging harness enables future capabilities such as:
-- Failure detection
-- Hallucination analysis
-- Prompt debugging
-- Model comparison
-- Automated reporting
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and add your API keys
+
+# 3. Build and run
+docker compose up --build
+
+# 4. Test the API
+curl http://localhost:8000/health
+curl http://localhost:8000/process-logs
+```
+
+The first `curl` returns service health. The second runs the C++ log processor against `data/runs.jsonl` and returns line counts (cached on repeat calls).
 
 ---
 
-## Project Components
+## Quick Start (Local, no Docker)
 
-### Prompt Runner (`run.py`)
-- CLI-based prompt execution
-- Fans out user prompts to multiple agents **concurrently**
-- Measures request timestamp (UTC) and per-agent latency (p50/p95/p99)
-- Validates each response and passes all data to the logger
+```bash
+# 1. Create virtual environment
+python -m venv llmenv
+source llmenv/bin/activate    # Windows: llmenv\Scripts\activate
 
-### LLM Client (`llm/client.py`)
-- `BaseAgent` ABC — shared interface contract for all agents
-- `AIBot` — Google Gemini Flash 2.5 (streaming)
-- `SecondAIBot` — Nebius-hosted OpenAI-compatible model
-- `StubBot` — offline deterministic agent (no API key required)
-- `AgentLatencyAnalysis` — rolling p50/p95/p99 latency tracking
-- `HandleErrorLogs` — normalises exceptions vs valid responses
-- `build_registry()` — factory that initialises agents after env vars are loaded
+# 2. Install dependencies
+pip install -r requirements.txt
 
-### Validators (`validators/`)
-- `BaseValidator` — abstract base with shared `build_result()` contract
-- `EmptyOutputValidator` — catches blank or whitespace-only responses
-- `ShortOutputValidator` — catches responses under 10 characters
-- `LongOutputValidator` — catches responses exceeding 300 characters (configurable)
-- `RunAllTests` — runs all validators and returns an aggregate pass/fail dict
+# 3. Compile the C++ binary
+g++ -O2 -pthread -o cpp/log_processor cpp/log_processor.cpp
 
-### Benchmark Runner (`benchmarks/`)
-- `prompts.json` — 10 predefined prompts covering normal, edge-case, and failure-trigger scenarios
-- `runner.py` — fans out each prompt to all agents, collects validation + latency, writes `data/benchmark_results.jsonl`, and prints a per-agent summary report
+# 4. Start Redis (must be running locally)
+redis-server
 
-### Logging Harness (`logger/run_logger.py`)
-- Receives prompt, response, and all metadata
-- Writes **one JSON object per run** to `data/runs.jsonl`
-- Append-only, JSONL format — easy to ingest for analysis
+# 5. Configure environment
+cp .env.example .env
+# Edit .env — set REDIS_URL=redis://localhost:6379/0
+
+# 6. Start the API server
+uvicorn api.main:app --reload
+
+# 7. Run prompts (generates data/runs.jsonl)
+python run.py --prompt "Hello" --agents stub
+```
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness check — reports Redis and C++ binary status |
+| `GET` | `/process-logs` | Run log processor. Query param: `?file=path/to/file.jsonl` |
+| `GET` | `/docs` | Auto-generated Swagger UI (FastAPI built-in) |
+
+### Example responses
+
+**`GET /health`**
+```json
+{
+  "status": "healthy",
+  "dependencies": {
+    "redis": "connected",
+    "cpp_binary": "found"
+  }
+}
+```
+
+**`GET /process-logs`**
+```json
+{
+  "total_lines": 847,
+  "error_lines": 23,
+  "cache": "miss"
+}
+```
+On the second call with the same file: `"cache": "hit"` — Redis serves the result instantly without re-running the binary.
+
+---
+
+## CLI Usage
+
+### Interactive mode
+```bash
+python run.py
+```
+
+### Single-shot prompt
+```bash
+python run.py --prompt "What is the capital of France?"
+```
+
+### Select agents
+```bash
+python run.py --prompt "Hello" --agents gemini stub
+python run.py --prompt "Hello" --agents stub          # offline, no API key needed
+```
+
+### Run benchmarks
+```bash
+python -m benchmarks.runner                            # all agents
+python -m benchmarks.runner --agents stub              # offline only
+python -m benchmarks.runner --agents gemini --timeout 30
+```
 
 ---
 
@@ -71,114 +167,85 @@ This logging harness enables future capabilities such as:
 
 ```
 llm-failure-toolkit/
-│
-├── run.py                    # Main prompt runner (interactive + single-shot)
-│
+├── api/
+│   └── main.py              # FastAPI server, Redis caching, /health endpoint
+├── cpp/
+│   ├── log_processor.cpp    # Multithreaded C++ log parser (4 threads, mutex)
+│   └── log_processor        # Compiled binary (gitignored)
 ├── llm/
-│   └── client.py             # BaseAgent, AIBot, SecondAIBot, StubBot, build_registry
-│
+│   └── client.py            # BaseAgent, AIBot (Gemini), SecondAIBot (OpenAI), StubBot
 ├── validators/
-│   ├── __init__.py
-│   ├── base.py               # contextValidation dataclass + BaseValidator ABC
-│   ├── basic_validators.py   # Empty, Short, Long output validators
-│   └── runner.py             # RunAllTests — runs all validators, returns aggregate result
-│
+│   ├── base.py              # contextValidation dataclass + BaseValidator ABC
+│   ├── basic_validators.py  # Empty, Short, Long output validators
+│   └── runner.py            # RunAllTests aggregate runner
 ├── benchmarks/
-│   ├── __init__.py
-│   ├── prompts.json          # 10 predefined benchmark prompts
-│   └── runner.py             # Benchmark runner — reports per-agent pass rates & latency
-│
+│   ├── prompts.json         # 10 predefined benchmark prompts
+│   └── runner.py            # Benchmark suite with per-agent reporting
 ├── logger/
-│   └── run_logger.py         # Logging harness — appends to data/runs.jsonl
-│
+│   └── run_logger.py        # Append-only JSONL logger
 ├── data/
-│   ├── runs.jsonl            # Runtime logs (gitignored)
-│   └── benchmark_results.jsonl  # Benchmark run logs (gitignored)
-│
-├── .env.example
+│   ├── runs.jsonl           # Runtime logs (gitignored)
+│   └── benchmark_results.jsonl
+├── run.py                   # CLI prompt runner
+├── Dockerfile               # Multi-stage build (GCC → Python slim)
+├── docker-compose.yml       # App + Redis orchestration
 ├── requirements.txt
+├── .env.example
 └── README.md
 ```
 
 ---
 
-## Setup Instructions
+## How the Caching Works
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/<your-username>/llm-failure-toolkit.git
-cd llm-failure-toolkit
+```
+Request ──► Hash file content (SHA-256) ──► Redis lookup
+                                               │
+                                     ┌─────────┴─────────┐
+                                     │                    │
+                                   HIT                  MISS
+                                     │                    │
+                              Return cached         Run C++ binary
+                              result instantly       Parse output
+                                                    Store in Redis
+                                                    (TTL: 1 hour)
+                                                    Return result
 ```
 
-### 2. Create and activate a virtual environment
-```bash
-python -m venv llmenv
-
-# Windows
-llmenv\Scripts\activate
-
-# macOS / Linux
-source llmenv/bin/activate
-```
-
-### 3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure environment variables
-Create a `.env` file and add your API keys:
-```
-GEMINI_API_KEY=your_gemini_key_here
-NEBIUS_API_KEY=your_nebius_key_here
-```
+The cache key is derived from the **file content**, not the file path. This means:
+- If you append new log lines → new hash → cache miss → fresh result
+- If the file hasn't changed → cache hit → instant response
+- No manual cache invalidation needed
 
 ---
 
-## CLI Usage
+## Configuration
 
-### Interactive mode (loop until `exit`)
-```bash
-python run.py
-```
+All configuration is done through environment variables (`.env` file):
 
-### Single-shot prompt mode
-```bash
-python run.py --prompt "What is the capital of France?"
-```
-
-### Select specific agents
-```bash
-python run.py --prompt "Hello" --agents gemini stub
-python run.py --prompt "Hello" --agents stub          # offline, no API key needed
-```
-
-### Set a custom timeout
-```bash
-python run.py --prompt "Hello" --timeout 10
-```
-
-### Run the benchmark suite
-```bash
-# All agents (default)
-python -m benchmarks.runner
-
-# Offline only (no API keys needed)
-python -m benchmarks.runner --agents stub
-
-# Specific agents with custom timeout
-python -m benchmarks.runner --agents gemini openai --timeout 30
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GEMINI_API_KEY` | — | Google Gemini API key |
+| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
+| `CACHE_TTL` | `3600` | Cache expiry in seconds |
+| `CPP_BINARY_PATH` | `cpp/log_processor` | Path to compiled binary |
+| `LOG_FILE_PATH` | `data/runs.jsonl` | Default log file to process |
 
 ---
 
-## Pet Project 2 — Validator
+## Technology Stack
 
-Validate outputs given by the model, detect failure cases, and store validation results.
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| API | FastAPI + Uvicorn | Async, auto-docs, type-safe, production-ready |
+| Cache | Redis 7 | In-memory speed, TTL support, industry standard |
+| Log Processing | C++ (std::thread, mutex) | Raw speed for line counting, multithreaded |
+| LLM Clients | Gemini, OpenAI-compatible | Multi-model comparison |
+| Containerisation | Docker + Compose | Reproducible builds, one-command deploy |
 
-**Validators implemented:**
-- `EmptyOutputValidator` — flags blank responses
-- `ShortOutputValidator` — flags responses under 10 chars
-- `LongOutputValidator` — flags responses over 300 chars
+---
 
-**Benchmark suite:** 10 prompts designed to trigger and surface specific failure modes across all agents.
+## License
+
+MIT
