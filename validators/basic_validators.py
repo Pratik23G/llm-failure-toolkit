@@ -59,3 +59,28 @@ class LongOutputValidator(BaseValidator):
             error="model_response exceeds max_output_chars" if is_too_long else None,
             meta={"length": len(cleaned_resp), "limit": limit}
         )
+
+class RefusalValidator(BaseValidator):
+    def validateTests(self, context: contextValidation) -> dict:
+        model_resp = context.model_response or ""
+        cleaned_resp = model_resp.strip().lower()
+        limit = context.max_output_chars or MODEL_CONTEXT_LENGTH
+        refusal_phrases = ["i can't help",
+                           "i cannot assist",
+                           "i'm unable to",
+                           "as an ai",
+                           "i'm not able to",
+                           "i cannot fulfill",
+                           "is illegal",
+                           "i am programmed to never",
+                           "assist with illegal",
+                           "i cannot provide"]
+        is_refusal = any(phrase in cleaned_resp for phrase in refusal_phrases)
+
+        
+        return self.build_result(
+            context=context,
+            passed=not is_refusal,
+            error="model_response contains refusal phrases" if is_refusal else None,
+            meta={"length": len(cleaned_resp), "limit": limit}
+        )
