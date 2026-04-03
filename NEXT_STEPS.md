@@ -425,3 +425,31 @@ The risk now is spreading too thin. Pick **one phase**, finish it
 end-to-end (C++ binary + Python integration + API endpoint + tests),
 and commit it before moving to the next. A finished vertical slice
 is worth more than three half-built features.
+
+---
+
+## Session Log
+
+### April 2, 2026 (30 min)
+- [x] Built `RefusalValidator` — detects model refusal responses using hardcoded phrase matching
+- [x] Wired into `run.py` validate_list and confirmed it runs in the pipeline
+- [x] Tested with Gemini (triggered real refusal), Stub, and OpenRouter
+- [x] Identified limitation: hardcoded phrases are brittle, need regex/scoring approach
+- [x] Committed and pushed to `VectorsB`
+
+### April 3, 2026 — Plan (45 min)
+
+**Goal:** Make `RefusalValidator` robust + build `RepetitionValidator`
+
+| Time | Task | Details |
+|------|------|---------|
+| 15 min | Upgrade `RefusalValidator` to regex patterns (Option A) | Replace hardcoded phrases with regex like `r"i (cannot\|can't\|won't) (help\|assist\|fulfill\|provide)"`. Catches far more refusal variants with fewer rules. |
+| 15 min | Build `RepetitionValidator` | New validator class — detect when a model loops or repeats the same sentence/phrase in its response. Pure string logic. |
+| 10 min | Run benchmarks + test both validators | `python run.py --agents stub gemini --prompt ...` with edge cases. Check `data/runs.jsonl` for correct validation output. |
+| 5 min | Commit, push, update this file | Mark tasks done, push to `VectorsB`. |
+
+**Future sessions (not tomorrow):**
+- Option B: Add keyword scoring layer on top of regex (count refusal-signal words, threshold at 3+)
+- Option C: LLM-as-a-judge for refusal detection (most robust, adds latency)
+- More validators: `LatencySpikeValidator`, `ConsistencyValidator`
+- Pytest suite for all validators
