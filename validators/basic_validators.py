@@ -84,3 +84,27 @@ class RefusalValidator(BaseValidator):
             error="model_response contains refusal phrases" if is_refusal else None,
             meta={"length": len(cleaned_resp), "limit": limit}
         )
+
+
+""" 
+This class makes sure to check for repeated prompts from agents
+so we could avoid repeated responses and loose token usage.
+"""
+
+class RepetitionValidator(BaseValidator):
+    def validateTests(self, context: contextValidation) -> dict:
+        model_resp = context.model_response or ""
+        
+        cleaned_resp = model_resp.strip().lower()
+        clean_sentence_resp = [s for s in re.split(r'[.\n]', cleaned_resp) if s.strip()]
+        
+
+        unique_sentences = set(clean_sentence_resp)
+        has_repeats = len(unique_sentences) < len(clean_sentence_resp)
+
+        return self.build_result(
+            context = context,
+            passed = not has_repeats,
+            error = "model_response contains repeated sentences" if has_repeats else None,
+            meta = {"length": len(clean_sentence_resp), "unique_sentences": len(unique_sentences)}
+        )
