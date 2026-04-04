@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from llm.client import build_registry
 from logger import run_logger
 from validators.base import contextValidation, BaseValidator
-from validators.basic_validators import EmptyOutputValidator, ShortOutputValidator, LongOutputValidator, RefusalValidator
+from validators.basic_validators import EmptyOutputValidator, ShortOutputValidator, LongOutputValidator, RefusalValidator, RepetitionValidator
 from validators.runner import RunAllTests
 
 ALLOWED_AGENTS = ["gemini", "stub", "openai"]
@@ -48,7 +48,7 @@ async def main():
         if args.prompt and args.interactive:
             parser.error("Cannot use --prompt and --interactive together")
 
-        validate_list = [EmptyOutputValidator(), ShortOutputValidator(), LongOutputValidator(), RefusalValidator()]
+        validate_list = [EmptyOutputValidator(), ShortOutputValidator(), LongOutputValidator(), RefusalValidator(), RepetitionValidator()]
 
         REGISTRY = build_registry()
 
