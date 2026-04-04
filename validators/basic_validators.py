@@ -6,6 +6,8 @@
 
 """
 
+import re
+
 from validators.base import contextValidation, BaseValidator
 
 #deciding a consistent result dictionary contract to store results
@@ -18,6 +20,13 @@ from validators.base import contextValidation, BaseValidator
 
 MIN_LENGTH = 10
 MODEL_CONTEXT_LENGTH = 300
+
+REFUSAL_PATTERN_RESP = [
+    re.compile( r"i (cannot|can't|won't|not allowed) (help|assist|fulfill|provide|do that)"),
+    re.compile( r"(as an| i am an) (ai|language model|assistant)"),
+    re.compile( r"(is|are) (illegal|againstmy work|unethical) "),
+    re.compile( r" against my (guidelines|policy) ")
+]
 
 class EmptyOutputValidator(BaseValidator):
     def validateTests(self, context: contextValidation) -> dict:
@@ -65,17 +74,8 @@ class RefusalValidator(BaseValidator):
         model_resp = context.model_response or ""
         cleaned_resp = model_resp.strip().lower()
         limit = context.max_output_chars or MODEL_CONTEXT_LENGTH
-        refusal_phrases = ["i can't help",
-                           "i cannot assist",
-                           "i'm unable to",
-                           "as an ai",
-                           "i'm not able to",
-                           "i cannot fulfill",
-                           "is illegal",
-                           "i am programmed to never",
-                           "assist with illegal",
-                           "i cannot provide"]
-        is_refusal = any(phrase in cleaned_resp for phrase in refusal_phrases)
+        
+        is_refusal = any(pattern.search(cleaned_resp) for pattern in REFUSAL_PATTERN_RESP)
 
         
         return self.build_result(
