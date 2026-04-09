@@ -1,4 +1,4 @@
-#TODO: Build and add logic here from base.py here
+
 
 """
     make some imports from base.py files for context validation and
@@ -22,10 +22,10 @@ MIN_LENGTH = 10
 MODEL_CONTEXT_LENGTH = 300
 
 REFUSAL_PATTERN_RESP = [
-    re.compile( r"i (cannot|can't|won't|not allowed) (help|assist|fulfill|provide|do that)"),
-    re.compile( r"(as an| i am an) (ai|language model|assistant)"),
-    re.compile( r"(is|are) (illegal|againstmy work|unethical) "),
-    re.compile( r" against my (guidelines|policy) ")
+    re.compile( r"i (cannot|can't|won't|not allowed) (help|assist|fulfill|provide|do that)", re.IGNORECASE),
+    re.compile( r"(as an| i am an) (ai|language model|assistant)", re.IGNORECASE),
+    re.compile( r"(is|are) (illegal|against my work|unethical) ", re.IGNORECASE),
+    re.compile( r" against my (guidelines|policy) ", re.IGNORECASE)
 ]
 
 class EmptyOutputValidator(BaseValidator):
@@ -38,7 +38,6 @@ class EmptyOutputValidator(BaseValidator):
             error = "model_response is empty or whitespace" if is_empty else None,
         )
 
-#TODO: Implement a validator for short inputs
 
 class ShortOutputValidator(BaseValidator):
     def validateTests(self, context: contextValidation) -> dict:
@@ -54,7 +53,6 @@ class ShortOutputValidator(BaseValidator):
             meta={"length": len(clean), "min_length": MIN_LENGTH},
         )
     
-#TODO: Implement context_validation for longer responses and if it passes the models limit
 class LongOutputValidator(BaseValidator):
     def validateTests(self, context: contextValidation) -> dict:
         model_longer_resp = context.model_response or ""
@@ -96,15 +94,51 @@ class RepetitionValidator(BaseValidator):
         model_resp = context.model_response or ""
         
         cleaned_resp = model_resp.strip().lower()
+        words_cleaned = cleaned_resp.split()
         clean_sentence_resp = [s for s in re.split(r'[.\n]', cleaned_resp) if s.strip()]
+        n = 3
+        n_gram_list = []
+
         
+        
+        for i in range(0, len(words_cleaned) - n +1):
+            chunk = words_cleaned[i : i + n]
+            n_gram_list.append(" ".join(chunk))
+        
+        unique_ngrams = len(set(n_gram_list))
+        total_ngrams = len(n_gram_list)
+
+        if total_ngrams == 0:
+            ngram_ratio = 0.0
+        else:
+            ngram_ratio = (total_ngrams - unique_ngrams) / total_ngrams
+
+            
 
         unique_sentences = set(clean_sentence_resp)
-        has_repeats = len(unique_sentences) < len(clean_sentence_resp)
 
+        unique = len(unique_sentences)
+        total = len(clean_sentence_resp)
+
+        
+        if total == 0:
+            repeat_ratio = 0.0
+        else:
+            repeat_ratio = (total - unique) / total
+        
+        has_sentence_repeats = repeat_ratio > 0.3
+
+        ngram_repeats = ngram_ratio > 0.5
+
+        has_repeats = has_sentence_repeats or ngram_repeats
+        
         return self.build_result(
             context = context,
             passed = not has_repeats,
             error = "model_response contains repeated sentences" if has_repeats else None,
-            meta = {"length": len(clean_sentence_resp), "unique_sentences": len(unique_sentences)}
+            meta = {"length": len(clean_sentence_resp), "unique_sentences": unique, 
+                    "repeat_ratio": repeat_ratio,
+                    "total_ngrams": total_ngrams,
+                    "unique_ngrams": unique_ngrams,
+                    "ngram_ratio": ngram_ratio,}
         )
